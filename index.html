@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>3D Mahalle - Multiplayer</title>
+<style>
+  body, html { margin:0;padding:0;width:100%;height:100%;background:#70c1b3;font-family:'Segoe UI',Tahoma,sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none; }
+  #game-canvas { position:absolute;top:0;left:0;width:100%;height:100%;z-index:1; }
+  #zone-left,#zone-right { position:absolute;top:0;width:50%;height:100%;z-index:5;touch-action:none; }
+  #zone-left { left:0; } #zone-right { left:50%; }
+  #crosshair { position:absolute;top:50%;left:50%;width:6px;height:6px;background:rgba(255,255,255,.7);border-radius:50%;transform:translate(-50%,-50%);z-index:6;pointer-events:none;box-shadow:0 0 4px rgba(0,0,0,.8); }
+  #joystick-base { position:absolute;width:110px;height:110px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);border-radius:50%;z-index:6;pointer-events:none;display:none;transform:translate(-50%,-50%); }
+  #joystick-stick { position:absolute;top:50%;left:50%;width:45px;height:45px;background:rgba(255,255,255,.8);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 4px 10px rgba(0,0,0,.3); }
+  #ui-layer { position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none; }
+  #hud { position:absolute;top:15px;left:50%;transform:translateX(-50%);background:rgba(15,20,25,.85);color:#fff;padding:10px 22px;border-radius:25px;font-size:14px;font-weight:bold;display:flex;gap:20px;border:1px solid rgba(255,255,255,.2);pointer-events:auto;backdrop-filter:blur(8px);box-shadow:0 5px 20px rgba(0,0,0,.4);white-space:nowrap; }
+  .val-money{color:#2ecc71;text-shadow:0 0 8px rgba(46,204,113,.6);}
+  .val-quest{color:#f39c12;text-shadow:0 0 8px rgba(243,156,18,.6);}
+  #btn-interact { position:absolute;bottom:35px;right:35px;width:85px;height:85px;background:rgba(255,255,255,.2);color:rgba(255,255,255,.4);border:2px solid rgba(255,255,255,.3);border-radius:50%;font-size:14px;font-weight:bold;display:flex;justify-content:center;align-items:center;pointer-events:auto;transition:.2s;touch-action:none;box-shadow:0 5px 15px rgba(0,0,0,.3); }
+  #btn-interact.ready { background:rgba(46,204,113,.95);color:#fff;border-color:#fff;box-shadow:0 0 25px rgba(46,204,113,.8);transform:scale(1.08); }
+  #btn-jump { position:absolute;bottom:35px;left:35px;width:85px;height:85px;background:rgba(52,152,219,.7);color:#fff;border:2px solid rgba(255,255,255,.5);border-radius:50%;font-size:14px;font-weight:bold;display:flex;justify-content:center;align-items:center;pointer-events:auto;transition:.1s;touch-action:none;box-shadow:0 5px 15px rgba(0,0,0,.3); }
+  #btn-jump:active { background:rgba(41,128,185,.95);transform:scale(.92); }
+  #npc-labels { position:absolute;top:0;left:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:hidden; }
+  .label { position:absolute;background:rgba(0,0,0,.7);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold;transform:translate(-50%,-100%);transition:opacity .1s;pointer-events:none;border:1px solid rgba(255,255,255,.2);white-space:nowrap; }
+  .label.remote { background:rgba(52,152,219,.85); }
+  #modal { display:none;flex-direction:column;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88%;max-width:440px;max-height:90vh;background:rgba(20,25,32,.97);color:#fff;padding:20px;border-radius:16px;border:1px solid rgba(255,255,255,.2);box-shadow:0 15px 50px rgba(0,0,0,.8);z-index:20;pointer-events:auto;text-align:center; }
+  #m-title { font-size:20px;color:#f1c40f;margin:0 0 10px;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:8px; }
+  #m-text { font-size:14px;margin-bottom:14px;color:#ecf0f1;line-height:1.4;text-align:left;max-height:120px;overflow-y:auto; }
+  #opts-container { overflow-y:auto;max-height:50vh;margin-bottom:8px; }
+  .btn-opt { background:#34495e;color:#fff;border:none;padding:12px;margin-bottom:8px;width:100%;border-radius:8px;font-size:14px;font-weight:bold;touch-action:none;box-shadow:0 4px 10px rgba(0,0,0,.2);transition:.1s;cursor:pointer;text-align:left; }
+  .btn-opt:active { background:#2980b9;transform:scale(.98); }
+  #btn-close { background:#c0392b;margin-top:4px;text-align:center; }
+  #toast-container { position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:30;pointer-events:none;display:flex;flex-direction:column;gap:8px;align-items:center;width:90%;max-width:400px; }
+  .toast { background:rgba(20,25,32,.95);color:#fff;padding:10px 18px;border-radius:10px;border:1px solid rgba(255,255,255,.2);font-size:13px;font-weight:bold;box-shadow:0 5px 20px rgba(0,0,0,.5);animation:tIn .3s ease;max-width:100%; }
+  .toast.success { border-left:4px solid #2ecc71; } .toast.warn { border-left:4px solid #f39c12; } .toast.info { border-left:4px solid #3498db; }
+  @keyframes tIn { from{opacity:0;transform:translateY(-10px);} to{opacity:1;transform:translateY(0);} }
+</style>
+</head>
+<body>
+  <div id="game-canvas"></div>
+  <div id="npc-labels"></div>
+  <div id="zone-left"></div>
+  <div id="zone-right"></div>
+  <div id="joystick-base"><div id="joystick-stick"></div></div>
+  <div id="crosshair"></div>
+  <div id="ui-layer">
+    <div id="hud">
+      <div>💰 <span id="v-money" class="val-money">0</span> ₺</div>
+      <div>📋 <span id="v-quest" class="val-quest">Yok</span></div>
+      <div>🌐 <span id="v-online">Tek</span></div>
+    </div>
+    <div id="btn-jump">ZIPLA</div>
+    <div id="btn-interact">Konuş</div>
+  </div>
+  <div id="toast-container"></div>
+  <div id="modal">
+    <h3 id="m-title">İsim</h3>
+    <div id="m-text">Metin</div>
+    <div id="opts-container"></div>
+    <button id="btn-close" class="btn-opt">Kapat</button>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+/* ========== GLOBAL ========== */
+let scene, camera, renderer;
+let money = 0, currentQuest = null;
+let npcs = [], cars = [], colliders = [];
+let nearestNPC = null, inDialog = false;
+let camPitch = 0, camYaw = 0;
+let joyMoveX = 0, joyMoveY = 0;
+const SPEED = 0.16;
+const LOOK_SENS = 0.0038;
+const GROUND_Y = 1.8, GRAVITY = 0.022, JUMP_POWER = 0.38;
+let playerVY = 0, onGround = true;
+
+const uiMoney = document.getElementById('v-money');
+const uiQuest = document.getElementById('v-quest');
+const uiOnline = document.getElementById('v-online');
+const btnInteract = document.getElementById('btn-interact');
+const btnJump = document.getElementById('btn-jump');
+const labelContainer = document.getElementById('npc-labels');
+const modal = document.getElementById('modal');
+const optsContainer = document.getElementById('opts-container');
+
+/* ========== TOAST ========== */
+function showToast(msg, type='info', dur=3000) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerText = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, dur);
+}
+const addMoney = m => { money += m; uiMoney.innerText = money; };
+function updateQuestHUD() {
+  if (!currentQuest) { uiQuest.innerText = 'Yok'; return; }
+  let s = currentQuest.name;
+  if (currentQuest.id === 'scraps') s += ` (${questState.scraps}/3)`;
+  if (currentQuest.id === 'cars')   s += ` (${questState.carsCounted.size}/3)`;
+  uiQuest.innerText = s;
+}
+
+/* ========== DİYALOG MOTORU (dinamik) ========== */
+function showDialogue(node, npcData) {
+  const text = (typeof node.text === 'function') ? node.text() : node.text;
+  const opts = (typeof node.opts === 'function') ? node.opts() : (node.opts || []);
+  document.getElementById('m-title').innerText = npcData.name;
+  document.getElementById('m-text').innerText = text;
+  optsContainer.innerHTML = '';
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-opt';
+    btn.innerText = opt.t;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      if (opt.action) opt.action();
+      const nxt = opt.next;
+      if (nxt === 'close') { modal.style.display='none'; inDialog=false; }
+      else if (nxt && npcData.dialogues[nxt]) showDialogue(npcData.dialogues[nxt], npcData);
+    };
+    optsContainer.appendChild(btn);
+  });
+  modal.style.display = 'flex';
+}
+
+/* ========== İNSAN MODELİ ========== */
+function createHumanModel(color) {
+  const g = new THREE.Group();
+  const skin = new THREE.MeshLambertMaterial({color:0xffdbac});
+  const shirt = new THREE.MeshLambertMaterial({color: color});
+  const pants = new THREE.MeshLambertMaterial({color: 0x2c3e50});
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28,12,12), skin);
+  head.position.y = 1.75; g.add(head);
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.9,0.3), shirt);
+  torso.position.y = 1.15; g.add(torso);
+
+  const armGeo = new THREE.BoxGeometry(0.18,0.7,0.18);
+  const lArm = new THREE.Mesh(armGeo, shirt); lArm.position.set(-0.4,1.15,0);
+  const rArm = new THREE.Mesh(armGeo, shirt); rArm.position.set( 0.4,1.15,0);
+  g.add(lArm, rArm);
+
+  const legGeo = new THREE.BoxGeometry(0.22,0.7,0.22);
+  const lLeg = new THREE.Mesh(legGeo, pants); lLeg.position.set(-0.15,0.35,0);
+  const rLeg = new THREE.Mesh(legGeo, pants); rLeg.position.set( 0.15,0.35,0);
+  g.add(lLeg, rLeg);
+
+  g.userData = { lArm, rArm, lLeg, rLeg };
+  return g;
+}
+
+/* ========== GÖREV SİSTEMİ ========== */
+const questState = {
+  hasBucket:false, hasWater:false, hasSimit:false, hasCay:false, hasKey:false,
+  scraps:0, carsCounted:new Set(),
+  talkedTourist:false, talkedProf:false,
+  completedQuests:new Set()
+};
+const questDefs = {
+  bucket:   { name:"Kovayı Getir",        reward:100, check:()=>questState.hasBucket, onDone:()=>{questState.hasBucket=false;} },
+  water:    { name:"Su Taşı",             reward:75,  check:()=>questState.hasWater,  onDone:()=>{questState.hasWater=false;} },
+  scraps:   { name:"Hurda Topla (3)",     reward:60,  check:()=>questState.scraps>=3, onDone:()=>{questState.scraps=0;} },
+  simit:    { name:"Simit Getir",         reward:20,  check:()=>questState.hasSimit,  onDone:()=>{questState.hasSimit=false;} },
+  cay:      { name:"Çay Getir",           reward:15,  check:()=>questState.hasCay,    onDone:()=>{questState.hasCay=false;} },
+  tourist:  { name:"Turiste Yardım",      reward:50,  check:()=>questState.talkedTourist, onDone:()=>{questState.talkedTourist=false;} },
+  professor:{ name:"Profesörü Ziyaret",   reward:40,  check:()=>questState.talkedProf, onDone:()=>{questState.talkedProf=false;} },
+  cars:     { name:"3 Araba Say",         reward:30,  check:()=>questState.carsCounted.size>=3, onDone:()=>{questState.carsCounted.clear();} },
+  key:      { name:"Kayıp Anahtar",       reward:80,  check:()=>questState.hasKey,    onDone:()=>{questState.hasKey=false;} },
+  master:   { name:"Büyük Usta Sınavı",   reward:500, check:()=>questState.completedQuests.size>=9, onDone:()=>{} }
+};
+function acceptQuest(id) {
+  const d = questDefs[id]; if (!d) return;
+  currentQuest = { id, name: d.name, reward: d.reward };
+  showToast(`📋 Görev alındı: ${d.name}`, 'info');
+  updateQuestHUD();
+}
+function completeCurrentQuest() {
+  if (!currentQuest) { showToast("Aktif görev yok!", 'warn'); return; }
+  const d = questDefs[currentQuest.id];
+  if (!d) { showToast("Görev yok!", 'warn'); return; }
+  if (!d.check()) { showToast(`Henüz tamamlanmadı: ${d.name}`, 'warn'); return; }
+  d.onDone();
+  addMoney(d.reward);
+  questState.completedQuests.add(currentQuest.id);
+  showToast(`✅ ${d.name} tamamlandı! +${d.reward}₺`, 'success', 4000);
+  currentQuest = null;
+  updateQuestHUD();
+}
+
+/* ========== NPC VERİTABANI ========== */
+const npcDB = [
+  {
+    name:"Tamirci Mehmet", color:0xd35400, pos:[-25,23], fixed:true,
+    dialogues:{
+      main:{
+        text:()=> currentQuest
+          ? `Mehmet Usta: Şu an "${currentQuest.name}" görevindesin. Bitirince gel, paranı vereyim.`
+          : "Mehmet Usta: Mahallede yapılacak çok iş var. Hangisinden başlamak istersin?",
+        opts:()=>{
+          const o = [{t:"📋 Görev Al / Değiştir", next:"quest_list"}];
+          if (currentQuest) o.push({t:"✅ Aktif Görevi Tamamla", action:completeCurrentQuest, next:"main"});
+          o.push({t:"💬 Sohbet et", next:"chat_life"});
+          o.push({t:"👋 Görüşürüz", next:"close"});
+          return o;
+        }
+      },
+      quest_list:{
+        text:"Mehmet Usta: Hangi görevi almak istersin?",
+        opts:()=>{
+          const o = [];
+          Object.entries(questDefs).forEach(([id,def])=>{
+            if (questState.completedQuests.has(id)) return;
+            if (id==='master' && questState.completedQuests.size < 9) {
+              o.push({t:`🔒 ${def.name} (${questState.completedQuests.size}/9)`, next:"quest_list"});
+              return;
+            }
+            o.push({t:`🎯 ${def.name} — ${def.reward}₺`, action:()=>acceptQuest(id), next:"main"});
+          });
+          o.push({t:"◀ Geri", next:"main"});
+          return o;
+        }
+      },
+      chat_life:{
+        text:"Mehmet Usta: Eskiden buralar hep dutluktu. Şimdi herkes elektronik peşinde. Sen ne dersin?",
+        opts:[
+          {t:"Donanım ve elektrik seviyorum usta!", next:"chat_support"},
+          {t:"Sadece para kazanmak istiyorum.", next:"chat_money"},
+          {t:"Geri dön", next:"main"}
+        ]
+      },
+      chat_support:{ text:"Mehmet Usta: Helal olsun! Pratik ustalık altın bileziktir.", opts:[{t:"Sağol usta.", next:"main"}] },
+      chat_money:  { text:"Mehmet Usta: Para kazanmak emek ister çırak!", opts:[{t:"Haklısın.", next:"main"}] }
+    }
+  },
+  {
+    name:"Simitçi Hüseyin", color:0xe74c3c, pos:[-8,-15],
+    dialogues:{
+      main:{
+        text:"Hüseyin Abi: Selamün aleyküm! Simitler sıcak, atıştıralım mı?",
+        opts:[
+          {t:"Simit al (-10₺)", action:()=>{
+            if (money>=10){ addMoney(-10); questState.hasSimit=true; showToast("🥯 Simit alındı! Mehmet Usta'ya götür.", 'success'); }
+            else showToast("Yeterli paran yok!", 'warn');
+          }, next:"main"},
+          {t:"Mahallede neler var?", next:"chat_gossip"},
+          {t:"İyi günler.", next:"close"}
+        ]
+      },
+      chat_gossip:{ text:"Hüseyin Abi: Tamirci Mehmet çırak arıyor, bir de eski depoda eşyalar varmış.", opts:[{t:"Sağol abi.", next:"main"}] }
+    }
+  },
+  {
+    name:"Çaycı Remzi", color:0x8e44ad, pos:[10,-25],
+    dialogues:{
+      main:{
+        text:"Remzi: Ooo kaptan! Demli bir çay ister misin?",
+        opts:[
+          {t:"Çay al (-5₺)", action:()=>{
+            if (money>=5){ addMoney(-5); questState.hasCay=true; showToast("☕ Çay alındı! Mehmet Usta'ya götür.", 'success'); }
+            else showToast("Cebinde 5₺ bile yok!", 'warn');
+          }, next:"main"},
+          {t:"İşler nasıl?", next:"chat_tea"},
+          {t:"Kolay gelsin.", next:"close"}
+        ]
+      },
+      chat_tea:{ text:"Remzi: Çaylar yetişmiyor valla!", opts:[{t:"Bol kazançlar.", next:"main"}] }
+    }
+  },
+  {
+    name:"Turist Maykıl", color:0xf1c40f, pos:[5,-35],
+    dialogues:{
+      main:{
+        text:"Michael: Hello my friend! Can you help me navigate?",
+        opts:[
+          {t:"Sure! (+25₺ bahşiş)", action:()=>{
+            addMoney(25); questState.talkedTourist=true;
+            showToast("🗺️  Turiste yardım ettin! +25₺", 'success');
+          }, next:"close"},
+          {t:"Sorry, busy.", next:"close"}
+        ]
+      }
+    }
+  },
+  {
+    name:"Ayşe Teyze", color:0x9b59b6, pos:[-15,-28],
+    dialogues:{
+      main:{
+        text:"Ayşe Teyze: Yavrum dikkat et, arabalar hızlı sürüyor.",
+        opts:[
+          {t:"Haklısın teyze.", next:"chat_advice"},
+          {t:"Görüşürüz.", next:"close"}
+        ]
+      },
+      chat_advice:{ text:"Ayşe Teyze: Allah zihin açıklığı versin evladım.", opts:[{t:"Sağol.", next:"main"}] }
+    }
+  },
+  {
+    name:"Profesör Ahmet", color:0x2c3e50, pos:[-65,-50], fixed:true,
+    dialogues:{
+      main:{
+        text:"Profesör Ahmet: Üniversitemize hoş geldin evlat. İlim öğrenmek ister misin?",
+        opts:[
+          {t:"Evet hocam!", action:()=>{ questState.talkedProf=true; showToast("🎓  Profesörle tanıştın!", 'success'); }, next:"chat_learn"},
+          {t:"Sadece geziyorum.", next:"chat_visit"},
+          {t:"Görüşürüz.", next:"close"}
+        ]
+      },
+      chat_learn:{ text:"Profesör: Harika! Dersler her gün 9'da.", opts:[{t:"Teşekkürler.", next:"main"}] },
+      chat_visit:{ text:"Profesör: Üniversitemizi gezmekten keyif al.", opts:[{t:"Sağolun.", next:"main"}] }
+    }
+  }
+];
+["Berber Ali","Kasap Nuri","Öğrenci Can","Manav Hasan","Kurye Efe","Mimar Su","Doktor Alp","Eczacı Buse","Tamirci Kadir","Sporcu Ege"].forEach(n=>{
+  npcDB.push({ name:n, color:Math.random()*0xffffff,
+    pos:[(Math.random()-0.5)*80, (Math.random()-0.5)*80 - 20],
+    dialogues:{ main:{ text:n+": Selam komşu! Nasıl gidiyor?", opts:[{t:"İyi, koşturmaca.", next:"c1"},{t:"Görüşürüz.", next:"close"}] },
+                c1:{ text:n+": Kendine iyi bak!", opts:[{t:"Sen de.", next:"close"}] } } });
+});
+
+/* ========== THREE.JS BAŞLAT ========== */
+window.onload = () => { initThree(); buildWorld(); setupControls(); animate(); };
+
+function initThree(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87CEEB);
+  scene.fog = new THREE.Fog(0x87CEEB, 30, 180);
+  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 500);
+  camera.position.set(0, GROUND_Y, 0);
+  camera.rotation.order = 'YXZ';
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+  dl.position.set(60,120,60); scene.add(dl);
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  document.getElementById('game-canvas').appendChild(renderer.domElement);
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+}
+function addCol(m){ m.updateMatrixWorld(true); colliders.push(new THREE.Box3().setFromObject(m)); }
+function makeTextTexture(text, bg, fg, w, h){
+  const c = document.createElement('canvas'); c.width = w||512; c.height = h||128;
+  const x = c.getContext('2d'); x.fillStyle = bg||'#000'; x.fillRect(0,0,c.width,c.height);
+  x.fillStyle = fg||'#fff'; x.font = 'bold ' + Math.floor(c.height*0.55) + 'px Arial';
+  x.textAlign='center'; x.textBaseline='middle'; x.fillText(text, c.width/2, c.height/2);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ========== OBJELER ========== */
+let collectibleBucket=null, fountainPos=null, scraps=[], keyObj=null;
+
+function createShop(){
+  const cx=-25, cz=25, W=14, H=5, D=12;
+  const wm = new THREE.MeshLambertMaterial({color:0xd35400});
+  const rm = new THREE.MeshLambertMaterial({color:0x2c3e50});
+  [ [W,H,0.4, cx, H/2, cz+D/2], [0.4,H,D, cx-W/2, H/2, cz], [0.4,H,D, cx+W/2, H/2, cz] ].forEach(([w,h,d,x,y,z])=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wm); m.position.set(x,y,z); scene.add(m); addCol(m);
+  });
+  const dW=3, dH=3.5, sideW=(W-dW)/2, frontZ=cz-D/2;
+  const fwL=new THREE.Mesh(new THREE.BoxGeometry(sideW,H,0.4),wm); fwL.position.set(cx-dW/2-sideW/2,H/2,frontZ); scene.add(fwL); addCol(fwL);
+  const fwR=new THREE.Mesh(new THREE.BoxGeometry(sideW,H,0.4),wm); fwR.position.set(cx+dW/2+sideW/2,H/2,frontZ); scene.add(fwR); addCol(fwR);
+  const lint=new THREE.Mesh(new THREE.BoxGeometry(dW,H-dH,0.4),wm); lint.position.set(cx,dH+(H-dH)/2,frontZ); scene.add(lint); addCol(lint);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(W+1,0.5,D+1),rm); roof.position.set(cx,H+0.25,cz); scene.add(roof);
+  const sTex=makeTextTexture('TAMİRCİ MEHMET','#d35400','#fff',512,128);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(8,1.1), new THREE.MeshBasicMaterial({map:sTex}));
+  sign.position.set(cx,dH+1,frontZ-0.25); sign.rotation.y=Math.PI; scene.add(sign);
+  const l=new THREE.PointLight(0xfff2cc,0.7,22); l.position.set(cx,H-0.8,cz); scene.add(l);
+  const bench=new THREE.Mesh(new THREE.BoxGeometry(9,1.1,1.6),new THREE.MeshLambertMaterial({color:0x5d4037}));
+  bench.position.set(cx,0.55,cz+D/2-1.6); scene.add(bench); addCol(bench);
+}
+function createUniversity(){
+  const cx=-65, cz=-55, W=40, H=18, D=30;
+  const wm=new THREE.MeshLambertMaterial({color:0xf5f5dc});
+  const tm=new THREE.MeshLambertMaterial({color:0x8b4513});
+  const rm=new THREE.MeshLambertMaterial({color:0x2c3e50});
+  const fl=new THREE.Mesh(new THREE.BoxGeometry(W-1.2,0.2,D-1.2),new THREE.MeshLambertMaterial({color:0xbdc3c7}));
+  fl.position.set(cx,0.1,cz); scene.add(fl);
+  [[W,H,0.6,cx,H/2,cz-D/2],[0.6,H,D,cx-W/2,H/2,cz],[0.6,H,D,cx+W/2,H/2,cz]].forEach(([w,h,d,x,y,z])=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wm); m.position.set(x,y,z); scene.add(m); addCol(m);
+  });
+  const dW=8, dH=5, sideW=(W-dW)/2, fz=cz+D/2;
+  const fL=new THREE.Mesh(new THREE.BoxGeometry(sideW,H,0.6),wm); fL.position.set(cx-dW/2-sideW/2,H/2,fz); scene.add(fL); addCol(fL);
+  const fR=new THREE.Mesh(new THREE.BoxGeometry(sideW,H,0.6),wm); fR.position.set(cx+dW/2+sideW/2,H/2,fz); scene.add(fR); addCol(fR);
+  const lt=new THREE.Mesh(new THREE.BoxGeometry(dW,H-dH,0.6),wm); lt.position.set(cx,dH+(H-dH)/2,fz); scene.add(lt); addCol(lt);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(W+2,0.8,D+2),rm); roof.position.set(cx,H+0.4,cz); scene.add(roof);
+  [-1,1].forEach(s=>{ const col=new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,dH,16),tm); col.position.set(cx+s*(dW/2+1.5),dH/2,fz+0.8); scene.add(col); addCol(col); });
+  const sTex=makeTextTexture('ÜNİVERSİTE','#1a5276','#fff',768,192);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(18,3), new THREE.MeshBasicMaterial({map:sTex}));
+  sign.position.set(cx,dH+3,fz+0.35); scene.add(sign);
+  [ [cx,H-2,cz+5], [cx,H-2,cz-5] ].forEach(([x,y,z])=>{ const l=new THREE.PointLight(0xffffff,0.7,45); l.position.set(x,y,z); scene.add(l); });
+  for(let row=0;row<4;row++) for(let s=-1;s<=1;s+=2){
+    const dx=cx+s*12, dz=cz-9+row*6;
+    const desk=new THREE.Mesh(new THREE.BoxGeometry(5,1.2,2),new THREE.MeshLambertMaterial({color:0x8e44ad}));
+    desk.position.set(dx,0.6,dz); scene.add(desk); addCol(desk);
+    const seat=new THREE.Mesh(new THREE.BoxGeometry(2.5,1.2,1.8),new THREE.MeshLambertMaterial({color:0x34495e}));
+    seat.position.set(dx,0.6,dz+2.2); scene.add(seat); addCol(seat);
+  }
+}
+function createFountain(){
+  const cx=15, cz=15;
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(2,2.2,1,16), new THREE.MeshLambertMaterial({color:0x95a5a6}));
+  base.position.set(cx,0.5,cz); scene.add(base); addCol(base);
+  const water=new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.8,0.1,16), new THREE.MeshLambertMaterial({color:0x3498db, transparent:true, opacity:0.75}));
+  water.position.set(cx,1.0,cz); scene.add(water);
+  const spout=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,1.5,8), new THREE.MeshLambertMaterial({color:0x95a5a6}));
+  spout.position.set(cx,1.75,cz); scene.add(spout);
+  const sTex=makeTextTexture('ÇEŞME','#3498db','#fff',256,64);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.4), new THREE.MeshBasicMaterial({map:sTex}));
+  sign.position.set(cx,2.7,cz); sign.rotation.y=-Math.PI/2; scene.add(sign);
+  fountainPos = new THREE.Vector3(cx,1,cz);
+}
+function createScraps(){
+  const positions = [[-40,10],[35,25],[50,-30]];
+  positions.forEach(([x,z])=>{
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.4), new THREE.MeshLambertMaterial({color:0x7f8c8d}));
+    m.position.set(x,0.15,z); scene.add(m);
+    scraps.push(m);
+  });
+}
+function createKey(){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.1,0.15), new THREE.MeshLambertMaterial({color:0xf1c40f}));
+  m.position.set(-45,-50,0.5); m.position.set(-45,0.5,-50); scene.add(m);
+  keyObj = m;
+}
+
+/* ========== DÜNYA ========== */
+function buildWorld(){
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(300,300), new THREE.MeshLambertMaterial({color:0x38b000}));
+  ground.rotation.x=-Math.PI/2; scene.add(ground);
+  const rM=new THREE.MeshLambertMaterial({color:0x333333});
+  const rz=new THREE.Mesh(new THREE.PlaneGeometry(16,300),rM); rz.rotation.x=-Math.PI/2; rz.position.y=0.02; scene.add(rz);
+  const rx=new THREE.Mesh(new THREE.PlaneGeometry(300,16),rM); rx.rotation.x=-Math.PI/2; rx.position.y=0.02; scene.add(rx);
+  const cM=new THREE.MeshLambertMaterial({color:0x95a5a6});
+  [[2,0.15,300,-9,0.075,0],[2,0.15,300,9,0.075,0],[300,0.15,2,0,0.075,-9],[300,0.15,2,0,0.075,9]].forEach(([w,h,d,x,y,z])=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),cM); m.position.set(x,y,z); scene.add(m);
+  });
+
+  // Oyuncu evi
+  const wM=new THREE.MeshLambertMaterial({color:0xecf0f1});
+  [[10,4,0.4,0,2,5],[0.4,4,10,-5,2,0],[0.4,4,10,5,2,0],[3.5,4,0.4,-3.25,2,-5],[3.5,4,0.4,3.25,2,-5]].forEach(([w,h,d,x,y,z])=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wM); m.position.set(x,y,z); scene.add(m); addCol(m);
+  });
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(10.5,0.3,10.5),new THREE.MeshLambertMaterial({color:0x7f8c8d}));
+  roof.position.set(0,4.15,0); scene.add(roof);
+  const bed=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.6,4),new THREE.MeshLambertMaterial({color:0x2980b9}));
+  bed.position.set(-3.5,0.3,2); scene.add(bed); addCol(bed);
+  const desk=new THREE.Mesh(new THREE.BoxGeometry(3,1,1.5),new THREE.MeshLambertMaterial({color:0x8e44ad}));
+  desk.position.set(3,0.5,3.5); scene.add(desk); addCol(desk);
+
+  createShop();
+  createUniversity();
+  createFountain();
+  createScraps();
+  createKey();
+
+  // Kova
+  collectibleBucket = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.4,0.9,12), new THREE.MeshLambertMaterial({color:0xe74c3c}));
+  collectibleBucket.position.set(45,0.45,-45); scene.add(collectibleBucket);
+
+  // Modern binalar
+  for(let i=-6;i<=6;i+=4){
+    if(Math.abs(i)<4) continue;
+    createBuilding(20, i*12, 12, 35, 12);  createBuilding(-20, i*12, 12, 28, 12);
+    createBuilding(i*12, 20, 12, 30, 12);  createBuilding(i*12, -20, 12, 40, 12);
+  }
+
+  // NPC'ler (insan modeli)
+  npcDB.forEach(data=>{
+    const g = createHumanModel(data.color);
+    g.position.set(data.pos[0], 0, data.pos[1]);
+    scene.add(g);
+    g.userData = Object.assign(g.userData, data);
+    g.userData.targetX = data.pos[0] + (Math.random()-0.5)*15;
+    g.userData.targetZ = data.pos[1] + (Math.random()-0.5)*15;
+    const lbl = document.createElement('div');
+    lbl.className = 'label'; lbl.innerText = data.name;
+    labelContainer.appendChild(lbl);
+    npcs.push({ group:g, label:lbl });
+  });
+
+  // Arabalar
+  const carGeo = new THREE.BoxGeometry(2.2,1.2,4.5);
+  const cCols = [0xe74c3c,0x3498db,0xf1c40f,0x2ecc71];
+  for(let i=0;i<4;i++){
+    const car = new THREE.Mesh(carGeo, new THREE.MeshLambertMaterial({color:cCols[i]}));
+    car.position.set(3, 0.6, i*40-60); scene.add(car);
+    cars.push({ mesh:car, speed:0.35, dir:1, limit:100, start:-100 });
+  }
+}
+function createBuilding(x,z,w,h,d){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshLambertMaterial({color:0xbdc3c7}));
+  b.position.set(x,h/2,z); scene.add(b); addCol(b);
+  const pM=new THREE.MeshLambertMaterial({color:0x2c3e50});
+  for(let py=3;py<h-2;py+=4) for(let pw=-w/2+2;pw<w/2-1;pw+=3){
+    const pane=new THREE.Mesh(new THREE.BoxGeometry(1.2,2,0.2),pM);
+    pane.position.set(x+pw,py,z+d/2+0.1); scene.add(pane);
+  }
+}
+
+/* ========== KONTROLLER ========== */
+const keys = {};
+function setupControls(){
+  const jBase=document.getElementById('joystick-base');
+  const jStick=document.getElementById('joystick-stick');
+  let lookId=null, lx=0, ly=0, moveId=null, jcx=0, jcy=0;
+  const JMAX=45;
+
+  addEventListener('touchstart', e=>{
+    for(const t of e.changedTouches){
+      if(t.clientX>=innerWidth/2 && lookId===null){ lookId=t.identifier; lx=t.clientX; ly=t.clientY; }
+      else if(t.clientX<innerWidth/2 && moveId===null && !inDialog){
+        moveId=t.identifier; jcx=t.clientX; jcy=t.clientY;
+        jBase.style.display='block'; jBase.style.left=jcx+'px'; jBase.style.top=jcy+'px';
+        updateJoy(jcx,jcy);
+      }
+    }
+  }, {passive:false});
+  addEventListener('touchmove', e=>{
+    for(const t of e.changedTouches){
+      if(t.identifier===lookId && !inDialog){
+        camYaw -= (t.clientX-lx)*LOOK_SENS;
+        camPitch -= (t.clientY-ly)*LOOK_SENS;
+        camPitch = Math.max(-1.4, Math.min(1.4, camPitch));
+        camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
+        lx=t.clientX; ly=t.clientY;
+      } else if(t.identifier===moveId && !inDialog) updateJoy(t.clientX, t.clientY);
+    }
+  }, {passive:false});
+  const resetTouch = e=>{
+    for(const t of e.changedTouches){
+      if(t.identifier===lookId) lookId=null;
+      if(t.identifier===moveId){
+        moveId=null; joyMoveX=0; joyMoveY=0;
+        jBase.style.display='none'; jStick.style.transform='translate(-50%,-50%)';
+      }
+    }
+  };
+  addEventListener('touchend', resetTouch); addEventListener('touchcancel', resetTouch);
+  function updateJoy(tx,ty){
+    let dx=tx-jcx, dy=ty-jcy; const dist=Math.hypot(dx,dy);
+    if(dist>JMAX){ dx=dx/dist*JMAX; dy=dy/dist*JMAX; }
+    jStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    joyMoveX = dx/JMAX; joyMoveY = -dy/JMAX;
+  }
+
+  // Klavye
+  addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; if(e.key===' ') doJump(); });
+  addEventListener('keyup',   e=>{ keys[e.key.toLowerCase()]=false; });
+
+  // Fare kamera
+  let mDown=false, mx=0, my=0;
+  renderer.domElement.addEventListener('mousedown', e=>{ mDown=true; mx=e.clientX; my=e.clientY; });
+  addEventListener('mousemove', e=>{
+    if(!mDown || inDialog) return;
+    camYaw -= (e.clientX-mx)*LOOK_SENS;
+    camPitch -= (e.clientY-my)*LOOK_SENS;
+    camPitch = Math.max(-1.4, Math.min(1.4, camPitch));
+    camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
+    mx=e.clientX; my=e.clientY;
+  });
+  addEventListener('mouseup', ()=>{ mDown=false; });
+
+  // Zıplama butonu
+  const doJumpBtn = e=>{ if(e.cancelable) e.preventDefault(); e.stopPropagation(); doJump(); };
+  btnJump.addEventListener('touchstart', doJumpBtn, {passive:false});
+  btnJump.addEventListener('click', doJumpBtn);
+
+  // Etkileşim
+  let lastTouch=0;
+  const handleInteract = e=>{
+    if(e.type==='click' && Date.now()-lastTouch<500) return;
+    if(e.type==='touchstart') lastTouch=Date.now();
+    if(e.cancelable) e.preventDefault();
+    e.stopPropagation();
+    handleInteraction();
+  };
+  btnInteract.addEventListener('touchstart', handleInteract, {passive:false});
+  btnInteract.addEventListener('click', handleInteract);
+
+  const closeH = e=>{ e.stopPropagation(); modal.style.display='none'; inDialog=false; };
+  document.getElementById('btn-close').addEventListener('touchstart', closeH, {passive:false});
+  document.getElementById('btn-close').addEventListener('click', closeH);
+}
+
+/* ========== ZIPLAMA ========== */
+function doJump(){
+  if(onGround && !inDialog){ playerVY = JUMP_POWER; onGround = false; }
+}
+
+/* ========== ETKİLEŞİM MANTIĞI ========== */
+function handleInteraction(){
+  // 1. Kova
+  if(collectibleBucket && camera.position.distanceTo(collectibleBucket.position) < 3.5){
+    if(currentQuest?.id==='bucket'){
+      questState.hasBucket = true;
+      scene.remove(collectibleBucket); collectibleBucket = null;
+      showToast("🪣 Kova alındı! Mehmet Usta'ya götür.", 'success');
+      return;
+    } else {
+      showToast("Bu bir görev eşyası. Önce Mehmet Usta'dan görev al.", 'warn');
+      return;
+    }
+  }
+  // 2. Çeşme
+  if(fountainPos && camera.position.distanceTo(fountainPos) < 3.5){
+    if(currentQuest?.id==='water' && !questState.hasWater){
+      questState.hasWater = true;
+      showToast("💧 Bidon doldu! Mehmet Usta'ya götür.", 'success');
+      return;
+    } else if(currentQuest?.id==='water' && questState.hasWater){
+      showToast("Bidon zaten dolu, Mehmet Usta'ya götür.", 'info');
+      return;
+    } else {
+      showToast("Serin çeşme suyu. (Görev almak için Mehmet Usta'ya git)", 'info');
+      return;
+    }
+  }
+  // 3. Hurda
+  if(currentQuest?.id==='scraps'){
+    for(let i=0;i<scraps.length;i++){
+      const s = scraps[i];
+      if(s && camera.position.distanceTo(s.position) < 2.5){
+        scene.remove(s); scraps[i] = null;
+        questState.scraps++;
+        updateQuestHUD();
+        showToast(`🔩 Hurda toplandı! (${questState.scraps}/3)`, 'success');
+        return;
+      }
+    }
+  }
+  // 4. Anahtar
+  if(keyObj && currentQuest?.id==='key' && camera.position.distanceTo(keyObj.position) < 2.5){
+    questState.hasKey = true;
+    scene.remove(keyObj); keyObj = null;
+    showToast("🔑 Anahtar bulundu! Mehmet Usta'ya götür.", 'success');
+    return;
+  }
+  // 5. NPC
+  if(nearestNPC && !inDialog){
+    inDialog = true; joyMoveX = 0; joyMoveY = 0;
+    document.getElementById('joystick-base').style.display = 'none';
+    showDialogue(nearestNPC.userData.dialogues.main, nearestNPC.userData);
+  }
+}
+
+const pBox = new THREE.Box3();
+function canMoveTo(nx,nz){
+  pBox.min.set(nx-0.4, 0.5, nz-0.4);
+  pBox.max.set(nx+0.4, 2.5, nz+0.4);
+  for(let i=0;i<colliders.length;i++) if(pBox.intersectsBox(colliders[i])) return false;
+  return true;
+}
+
+/* ========== MULTIPLAYER ========== */
+let socket = null;
+const remotePlayers = {};
+function initMultiplayer(){
+  if(typeof io === 'undefined'){ uiOnline.innerText = 'Tek (offline)'; return; }
+  try {
+    socket = io({ timeout: 2000 });
+    socket.on('connect', ()=>{ uiOnline.innerText = 'Bağlı: ' + socket.id.substr(0,4); });
+    socket.on('currentPlayers', players=>{
+      Object.values(players).forEach(p=>{ if(p.id !== socket.id) createRemotePlayer(p); });
+    });
+    socket.on('newPlayer', p=>createRemotePlayer(p));
+    socket.on('playerMoved', p=>updateRemotePlayer(p));
+    socket.on('playerDisconnected', id=>removeRemotePlayer(id));
+    socket.on('connect_error', ()=>{ uiOnline.innerText = 'Tek (sunucu yok)'; });
+  } catch(e){ uiOnline.innerText = 'Tek'; }
+}
+function createRemotePlayer(d){
+  const model = createHumanModel(d.color || 0x3498db);
+  model.position.set(d.x||0, 0, d.z||0);
+  model.rotation.y = d.ry||0;
+  scene.add(model);
+  const lbl = document.createElement('div');
+  lbl.className = 'label remote'; lbl.innerText = 'Oyuncu ' + (d.id||'').substr(0,4);
+  labelContainer.appendChild(lbl);
+  remotePlayers[d.id] = { model, label: lbl };
+}
+function updateRemotePlayer(d){
+  const r = remotePlayers[d.id]; if(!r) return;
+  r.model.position.x = d.x; r.model.position.z = d.z;
+  r.model.rotation.y = d.ry || 0;
+}
+function removeRemotePlayer(id){
+  const r = remotePlayers[id]; if(!r) return;
+  scene.remove(r.model); r.label.remove();
+  delete remotePlayers[id];
+}
+let lastSend = 0;
+function sendPosition(now){
+  if(!socket || !socket.connected) return;
+  if(now - lastSend < 100) return;
+  lastSend = now;
+  socket.emit('playerMove', {
+    x: camera.position.x, y: camera.position.y, z: camera.position.z,
+    ry: camYaw
+  });
+}
+
+/* ========== ANIMATE ========== */
+function animate(){
+  requestAnimationFrame(animate);
+
+  // Hareket
+  let mx=joyMoveX, mz=joyMoveY;
+  if(keys['w']||keys['arrowup']) mz=1;
+  if(keys['s']||keys['arrowdown']) mz=-1;
+  if(keys['a']||keys['arrowleft']) mx=-1;
+  if(keys['d']||keys['arrowright']) mx=1;
+
+  if(!inDialog && (mx!==0 || mz!==0)){
+    const fw = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), camYaw);
+    const rt = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), camYaw);
+    let dx = (rt.x*mx*SPEED) + (fw.x*mz*SPEED);
+    let dz = (rt.z*mx*SPEED) + (fw.z*mz*SPEED);
+    if(canMoveTo(camera.position.x+dx, camera.position.z)) camera.position.x += dx;
+    if(canMoveTo(camera.position.x, camera.position.z+dz)) camera.position.z += dz;
+  }
+
+  // Zıplama fiziği
+  if(!onGround){
+    playerVY -= GRAVITY;
+    camera.position.y += playerVY;
+    if(camera.position.y <= GROUND_Y){
+      camera.position.y = GROUND_Y; playerVY = 0; onGround = true;
+    }
+  }
+
+  // NPC animasyon + label
+  let minDist=4, closest=null;
+  npcs.forEach(n=>{
+    const g=n.group, d=camera.position.distanceTo(g.position);
+    if(d<minDist){ minDist=d; closest=g; }
+
+    let moving = false;
+    if(!g.userData.fixed){
+      const tx=g.userData.targetX, tz=g.userData.targetZ;
+      const dir = new THREE.Vector3(tx-g.position.x, 0, tz-g.position.z);
+      if(dir.length()<1){
+        g.userData.targetX = g.position.x + (Math.random()-0.5)*20;
+        g.userData.targetZ = g.position.z + (Math.random()-0.5)*20;
+      } else {
+        dir.normalize(); g.position.addScaledVector(dir, 0.02);
+        moving = true;
+        g.rotation.y = Math.atan2(dir.x, dir.z);
+      }
+    }
+    // Yürüme animasyonu
+    if(moving){
+      const t = performance.now()*0.008;
+      const swing = Math.sin(t)*0.5;
+      g.userData.lLeg.rotation.x = swing;
+      g.userData.rLeg.rotation.x = -swing;
+      g.userData.lArm.rotation.x = -swing;
+      g.userData.rArm.rotation.x = swing;
+    } else {
+      g.userData.lLeg.rotation.x *= 0.85;
+      g.userData.rLeg.rotation.x *= 0.85;
+      g.userData.lArm.rotation.x *= 0.85;
+      g.userData.rArm.rotation.x *= 0.85;
+    }
+
+    const p = g.position.clone(); p.y += 2.4; p.project(camera);
+    if(p.z>1) n.label.style.display='none';
+    else {
+      n.label.style.display='block';
+      n.label.style.left = (p.x*0.5+0.5)*innerWidth + 'px';
+      n.label.style.top  = (p.y*-0.5+0.5)*innerHeight + 'px';
+      n.label.style.opacity = Math.max(0, 1 - d/25);
+    }
+  });
+
+  // Araba sayma (quest)
+  if(currentQuest?.id==='cars'){
+    cars.forEach((c,i)=>{
+      if(!questState.carsCounted.has(i) && camera.position.distanceTo(c.mesh.position) < 3){
+        questState.carsCounted.add(i);
+        updateQuestHUD();
+        showToast(`🚗 Araba sayıldı! (${questState.carsCounted.size}/3)`, 'success');
+      }
+    });
+  }
+
+  // Araba hareketi
+  cars.forEach(c=>{
+    c.mesh.position.z += c.speed*c.dir;
+    if(c.mesh.position.z > c.limit) c.mesh.position.z = c.start;
+  });
+
+  // Uzaktaki oyuncu labelları
+  Object.values(remotePlayers).forEach(r=>{
+    const p = r.model.position.clone(); p.y += 2.4; p.project(camera);
+    if(p.z>1) r.label.style.display='none';
+    else {
+      r.label.style.display='block';
+      r.label.style.left = (p.x*0.5+0.5)*innerWidth + 'px';
+      r.label.style.top  = (p.y*-0.5+0.5)*innerHeight + 'px';
+    }
+  });
+
+  // Interact butonu durumu
+  let nearBucket = collectibleBucket && camera.position.distanceTo(collectibleBucket.position) < 3.5;
+  let nearFountain = fountainPos && camera.position.distanceTo(fountainPos) < 3.5;
+  let nearScrap = false, nearKey = false;
+  if(currentQuest?.id==='scraps') scraps.forEach(s=>{ if(s && camera.position.distanceTo(s.position)<2.5) nearScrap=true; });
+  if(currentQuest?.id==='key' && keyObj && camera.position.distanceTo(keyObj.position)<2.5) nearKey=true;
+
+  nearestNPC = closest;
+  const canDo = (nearestNPC || nearBucket || nearFountain || nearScrap || nearKey) && !inDialog;
+  if(canDo){
+    btnInteract.classList.add('ready');
+    if(nearBucket) btnInteract.innerText = 'Al';
+    else if(nearFountain) btnInteract.innerText = 'Doldur';
+    else if(nearScrap) btnInteract.innerText = 'Topla';
+    else if(nearKey) btnInteract.innerText = 'Al';
+    else btnInteract.innerText = 'Konuş';
+  } else {
+    btnInteract.classList.remove('ready');
+    btnInteract.innerText = 'Konuş';
+  }
+
+  sendPosition(performance.now());
+  renderer.render(scene, camera);
+}
+
+// Multiplayer'ı başlat
+window.addEventListener('load', initMultiplayer);
+</script>
+</body>
+</html>
